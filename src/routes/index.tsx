@@ -4,6 +4,7 @@ import { Play, Sparkles, Zap, AudioLines, ShieldCheck } from "lucide-react";
 import heroPeople from "@/assets/hero-people.jpg";
 import { Navbar } from "@/components/landing/Navbar";
 import { SpeechCard } from "@/components/landing/SpeechCard";
+import { FlagDE, FlagUS } from "@/components/landing/Flags";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -98,20 +99,6 @@ function Index() {
             </div>
 
             <div className="animate-fade-up relative" style={{ animationDelay: "0.15s" }}>
-              <svg
-                aria-hidden
-                viewBox="0 0 600 200"
-                className="absolute left-1/2 top-1/2 w-[85%] -translate-x-1/2 -translate-y-1/2 text-primary opacity-[0.14] blur-[1px]"
-              >
-                <path
-                  d="M0 100 Q 60 20 120 100 T 240 100 T 360 100 T 480 100 T 600 100"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="10"
-                  strokeLinecap="round"
-                />
-              </svg>
-
               <div className="relative">
                 <img
                   src={heroPeople}
@@ -121,14 +108,30 @@ function Index() {
                   className="mx-auto w-full max-w-[620px] [mask-image:linear-gradient(to_bottom,black_72%,transparent_100%)]"
                 />
 
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute left-1/2 top-[46%] flex h-24 -translate-x-1/2 -translate-y-1/2 items-center gap-[3px] opacity-40"
+                >
+                  {Array.from({ length: 26 }).map((_, i) => {
+                    const h = 20 + Math.abs(Math.sin(i * 1.3)) * 70 * (1 - Math.abs(i - 12.5) / 20);
+                    return (
+                      <span
+                        key={i}
+                        className="animate-wave w-[3px] rounded-full bg-primary/50"
+                        style={{ height: `${h}%`, animationDelay: `${i * 0.06}s` }}
+                      />
+                    );
+                  })}
+                </div>
+
                 <SpeechCard
-                  flag="🇺🇸"
+                  flag={<FlagUS />}
                   text="How are you?"
                   tone="blue"
                   className="absolute left-0 top-[18%] sm:left-4"
                 />
                 <SpeechCard
-                  flag="🇩🇪"
+                  flag={<FlagDE />}
                   text="Wie geht es dir?"
                   tone="purple"
                   delay="1.5s"
