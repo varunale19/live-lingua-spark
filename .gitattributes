@@ -1,0 +1,10 @@
+# Exclude auto-generated files, lockfiles, and tsconfigs from GitHub language statistics
+frontend/bun.lock linguist-generated=true
+frontend/bun.lock linguist-vendored=true
+frontend/src/routeTree.gen.ts linguist-generated=true
+frontend/tsconfig.json linguist-generated=true
+backend/tsconfig.json linguist-generated=true
+
+# Ensure JS and JSX are detected as JavaScript
+*.js linguist-language=JavaScript
+*.jsx linguist-language=JavaScript
