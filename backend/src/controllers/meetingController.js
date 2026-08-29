@@ -1,5 +1,17 @@
+import crypto from "crypto";
+import bcrypt from "bcryptjs";
 import { Meeting } from "../models/Meeting.js";
 import { MeetingParticipant } from "../models/MeetingParticipant.js";
+
+function generateMeetingPassword() {
+  const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let password = "";
+  const bytes = crypto.randomBytes(8);
+  for (let i = 0; i < 8; i++) {
+    password += chars[bytes[i] % chars.length];
+  }
+  return password;
+}
 
 function formatDate(d) {
   if (!d) return "";
@@ -30,11 +42,17 @@ export async function createMeeting(req, res) {
 
     const randomCode = Math.floor(100000000 + Math.random() * 900000000).toString();
     const meetingId = `${randomCode.slice(0, 3)}-${randomCode.slice(3, 6)}-${randomCode.slice(6)}`;
+    
+    // Generate secure random meeting password and hash it
+    const plainPassword = generateMeetingPassword();
+    const salt = await bcrypt.genSalt(10);
+    const meetingPasswordHash = await bcrypt.hash(plainPassword, salt);
 
     const newMeeting = await Meeting.create({
       meetingId,
       name: name.trim(),
       description: (description || "").trim(),
+      meetingPasswordHash,
       hostId: req.user._id,
       status: "upcoming",
       startedAt: null,
@@ -48,11 +66,13 @@ export async function createMeeting(req, res) {
       listeningLanguage: req.user.listeningLanguage || "Telugu",
     });
 
+    // Return plain-text password ONCE to authenticated host
     res.status(201).json({
       success: true,
       meeting: {
         id: newMeeting._id.toString(),
         meetingId: newMeeting.meetingId,
+        password: plainPassword,
         name: newMeeting.name,
         description: newMeeting.description,
         status: newMeeting.status,
@@ -66,9 +86,46 @@ export async function createMeeting(req, res) {
   }
 }
 
+export async function verifyMeeting(req, res) {
+  try {
+    const { meetingId, password } = req.body;
+    if (!meetingId || !meetingId.trim()) {
+      return res.status(400).json({ success: false, message: "Meeting ID is required." });
+    }
+    if (!password || !password.trim()) {
+      return res.status(400).json({ success: false, message: "Meeting password is required." });
+    }
+
+    const cleanMeetingId = meetingId.trim();
+    const meeting = await Meeting.findOne({ meetingId: cleanMeetingId });
+
+    if (!meeting) {
+      return res.status(404).json({ success: false, message: "Meeting not found." });
+    }
+
+    if (meeting.meetingPasswordHash) {
+      const isMatch = await bcrypt.compare(password.trim(), meeting.meetingPasswordHash);
+      if (!isMatch) {
+        return res.status(401).json({ success: false, message: "Incorrect meeting password." });
+      }
+    }
+
+    return res.json({
+      success: true,
+      meetingId: cleanMeetingId,
+      name: meeting.name,
+      status: meeting.status,
+      message: "Meeting credentials verified.",
+    });
+  } catch (error) {
+    console.error("Error verifying meeting:", error);
+    return res.status(500).json({ success: false, message: "Error verifying meeting" });
+  }
+}
+
 export async function joinMeeting(req, res) {
   try {
-    const { meetingId, listeningLanguage } = req.body;
+    const { meetingId, password, listeningLanguage } = req.body;
     if (!meetingId) {
       res.status(400).json({ success: false, message: "Meeting ID is required" });
       return;
@@ -77,7 +134,19 @@ export async function joinMeeting(req, res) {
     const cleanMeetingId = meetingId.trim();
 
     const meeting = await Meeting.findOne({ meetingId: cleanMeetingId });
-    if (meeting && (meeting.status === "upcoming" || meeting.status === "scheduled")) {
+    if (!meeting) {
+      return res.status(404).json({ success: false, message: "Meeting not found." });
+    }
+
+    // Verify password if provided / required
+    if (password && meeting.meetingPasswordHash) {
+      const isMatch = await bcrypt.compare(password.trim(), meeting.meetingPasswordHash);
+      if (!isMatch) {
+        return res.status(401).json({ success: false, message: "Incorrect meeting password." });
+      }
+    }
+
+    if (meeting.status === "upcoming" || meeting.status === "scheduled") {
       meeting.status = "live";
       if (!meeting.startedAt) {
         meeting.startedAt = new Date();

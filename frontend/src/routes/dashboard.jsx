@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Video, Link2, AudioLines, ShieldCheck, Bell, Plus } from "lucide-react";
+import { Video, Link2, AudioLines, ShieldCheck, Bell, Plus, Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import { DashboardLayout } from "../components/dashboard/DashboardLayout";
 import { CreateMeetingModal } from "../components/dashboard/CreateMeetingModal";
@@ -106,13 +107,48 @@ function Dashboard() {
   const navigate = useNavigate();
 
   const [joinIdInput, setJoinIdInput] = useState("");
+  const [joinPasswordInput, setJoinPasswordInput] = useState("");
+  const [showJoinPassword, setShowJoinPassword] = useState(false);
+  const [isVerifyingJoin, setIsVerifyingJoin] = useState(false);
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isJoinOpen, setIsJoinOpen] = useState(false);
 
-  const handleJoinSubmit = (e) => {
+  const handleJoinSubmit = async (e) => {
     e.preventDefault();
-    if (!joinIdInput.trim()) return;
-    setIsJoinOpen(true);
+    if (!joinIdInput.trim()) {
+      toast.error("Please enter a Meeting ID");
+      return;
+    }
+    if (!joinPasswordInput.trim()) {
+      toast.error("Please enter the Meeting Password");
+      return;
+    }
+
+    setIsVerifyingJoin(true);
+    try {
+      const res = await fetch("http://localhost:5000/api/meetings/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          meetingId: joinIdInput.trim(),
+          password: joinPasswordInput.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setIsJoinOpen(true);
+      } else {
+        toast.error(data.message || "Failed to verify meeting credentials.");
+      }
+    } catch (err) {
+      console.error("Verification error:", err);
+      toast.error("Network error verifying meeting.");
+    } finally {
+      setIsVerifyingJoin(false);
+    }
   };
 
   const handleStartMeeting = (meeting) => {
@@ -246,7 +282,7 @@ function Dashboard() {
                 </div>
                 <h2 className="text-xl font-extrabold text-slate-900">Join a Meeting</h2>
                 <p className="mt-2 text-xs sm:text-sm text-slate-600 leading-relaxed max-w-xs">
-                  Enter a meeting ID to join an existing conversation.
+                  Enter a meeting ID and password to join an existing conversation.
                 </p>
               </div>
 
@@ -255,21 +291,45 @@ function Dashboard() {
             </div>
 
             <form onSubmit={handleJoinSubmit} className="mt-8 pt-4 border-t border-emerald-100/60 space-y-3">
+              {/* Meeting ID Input */}
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Enter Meeting ID (e.g. 849-204-192)"
+                  required
+                  placeholder="Meeting ID (e.g. 849-204-192)"
                   value={joinIdInput}
                   onChange={(e) => setJoinIdInput(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white py-3 px-4 text-xs sm:text-sm font-medium text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all shadow-xs"
+                  className="w-full rounded-2xl border border-slate-200 bg-white py-3 px-4 text-xs sm:text-sm font-medium text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all shadow-xs font-mono"
                 />
               </div>
+
+              {/* Meeting Password Input with Eye Icon */}
+              <div className="relative">
+                <input
+                  type={showJoinPassword ? "text" : "password"}
+                  required
+                  placeholder="Meeting Password"
+                  value={joinPasswordInput}
+                  onChange={(e) => setJoinPasswordInput(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-4 pr-11 text-xs sm:text-sm font-medium text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all shadow-xs font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowJoinPassword(!showJoinPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                  title={showJoinPassword ? "Hide Password" : "Show Password"}
+                >
+                  {showJoinPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+
               <button
                 type="submit"
-                className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-3.5 px-6 text-sm font-bold text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-700 hover:shadow-lg hover:shadow-emerald-500/30 transition-all cursor-pointer"
+                disabled={isVerifyingJoin}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-3.5 px-6 text-sm font-bold text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-700 hover:shadow-lg hover:shadow-emerald-500/30 transition-all cursor-pointer disabled:opacity-50"
               >
                 <Link2 size={18} />
-                Join Meeting
+                {isVerifyingJoin ? "Verifying..." : "Join Meeting"}
               </button>
             </form>
           </div>
@@ -286,6 +346,7 @@ function Dashboard() {
         onClose={() => setIsJoinOpen(false)}
         onSuccess={handleJoinMeetingSuccess}
         initialMeetingId={joinIdInput}
+        initialPassword={joinPasswordInput}
       />
     </DashboardLayout>
   );

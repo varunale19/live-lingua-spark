@@ -17,6 +17,10 @@ const meetingSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    meetingPasswordHash: {
+      type: String,
+      default: null,
+    },
     hostId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
